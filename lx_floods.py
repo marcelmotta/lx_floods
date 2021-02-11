@@ -281,6 +281,70 @@ def cumWeather(df, window):
                          
     return df4
 
+def cumWeather_k(var):
+    """ Find best window for cumulative weather measures """
+    
+    global gago_coutinho, geofisico, ajuda, data
+    gago_ = gago_coutinho.copy()
+    geo_ = geofisico.copy()
+    ajuda_= ajuda.copy()
+    
+    window = [2, 5, 10, 20]
+    
+    # CALCULATE CUMULATIVE VALUES USING WINDOW LIST
+    for i in window:
+        gago_ = cumWeather(gago_, i)
+        geo_ = cumWeather(geo_, i)
+        ajuda_ = cumWeather(ajuda_, i)
+    
+    # AGGREGATE WITH COMPLETE DATA SET
+    data_gago = gago_.reset_index().merge(data, on=['datetime', 'station'], \
+                                          how='left', sort='datetime')
+    data_gago['target'].fillna(0, inplace=True)
+    data_gago['station'] = 'gago_coutinho'
+    
+    data_geo = geo_.reset_index().merge(data, on=['datetime', 'station'], \
+                                        how='left', sort='datetime')
+    data_geo['target'].fillna(0, inplace=True)
+    data_geo['station'] = 'geofisico'
+    
+    data_ajuda = ajuda_.reset_index().merge(data, on=['datetime', 'station'], \
+                                            how='left', sort='datetime')
+    data_ajuda['target'].fillna(0, inplace=True)
+    data_ajuda['station'] = 'ajuda'
+    
+    data_all = pd.concat([data_gago, data_geo, data_ajuda], axis=0) # TO BE USED FOR PLOTS
+    data_all = pd.concat([data_all, pd.get_dummies(data_all['station'], prefix='station')], axis=1)
+    data_all = data_all.loc[(data_all['precip_avg'] > 0) | (data_all['precip_2h'] > 0)]
+    
+    X = data_all.filter(regex=r'^(?=.*{})(?!.*avg).*'.format(var), axis=1)
+    y = data_all['target']
+
+    # GET FEATURE VALUE
+    feat_value = selectFeatures(X, 
+                                y, 
+                                RandomForestClassifier(random_state=42), 
+                                scale=None)
+    
+    # PLOT RESULTS       
+    fig, axes = plt.subplots(figsize=(10,6))
+    axes.barh(feat_value['variable'],
+              feat_value['importance'],
+              facecolor='slategrey',
+              height=0.75,
+              alpha=0.5)
+    
+    axes.xaxis.grid(True, color='#dddddd', zorder=0)
+    axes.set_axisbelow(True)
+    axes.spines['top'].set_color('white')
+    axes.spines['left'].set_color('white')
+    axes.spines['bottom'].set_color('white')
+    axes.spines['right'].set_color('white')
+    
+    plt.show()
+    
+    return feat_value
+
 def getPCA(df, pc, scale_in, scale_out):
     """ Standardize data and get corresponding PCAs """
     
@@ -437,7 +501,7 @@ def selectFeatures(df_X, df_y, model, scale):
     
     plt.show()
     
-    return features
+    return features.sort_values(['rfe', 'importance'], ascending=True)
 
 def testSampling(df_X, df_y, model, scale, seed=42):
     """ Test sampling methods and ratio using a given set of metrics """      
@@ -756,6 +820,8 @@ ajuda = imputeKNN(ajuda)
 imputeRF(gago_coutinho)
 imputeRF(geofisico)
 imputeRF(ajuda)
+
+k_weather = cumWeather_k('precip')
 
 gago_coutinho = cumWeather(gago_coutinho, 2)
 geofisico = cumWeather(geofisico, 2)
