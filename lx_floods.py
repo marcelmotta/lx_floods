@@ -821,7 +821,7 @@ imputeRF(gago_coutinho)
 imputeRF(geofisico)
 imputeRF(ajuda)
 
-k_weather = cumWeather_k('precip')
+#k_weather = cumWeather_k('precip')
 
 gago_coutinho = cumWeather(gago_coutinho, 2)
 geofisico = cumWeather(geofisico, 2)
